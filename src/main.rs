@@ -1,9 +1,12 @@
 use iced::Settings;
 use iced::pure::Sandbox;
 use iced::pure::widget::{Row, Button, Text, TextInput, Column, Container};
+use iced::Length::FillPortion;
 
 fn main() -> Result<(), iced::Error> {
-    GradeMapper::run(Settings::default())
+    let mut gm_settings = Settings::default();
+    gm_settings.default_font = Some(b"JetBrainsMono");
+    GradeMapper::run(gm_settings)
 }
 
 #[derive(Debug, Clone)]
@@ -68,24 +71,26 @@ impl Sandbox for GradeMapper {
     }
 
     fn view(&self) -> iced::pure::Element<Self::Message> {
-        let avg_out = Text::new(format!("BALL: {}", self.avg));
+        let avg_out = Text::new(format!("GRADE: {}", self.avg))
+            .width(FillPortion(2));
 
         // кириллица не работает
-        let work1 = Button::new("KLASSNAYA").on_press(Message::ProcessGrade(1.0));
-        let work2 = Button::new("SAMOSTOYATELNAYA").on_press(Message::ProcessGrade(1.2));
-        let work3 = Button::new("PROVEROCHNAYA").on_press(Message::ProcessGrade(1.3));
-        let work4 = Button::new("KONTROLNAYA").on_press(Message::ProcessGrade(1.5));
+        let work1 = Button::new("KLASSNAYA").on_press(Message::ProcessGrade(1.0)).width(FillPortion(1));
+        let work2 = Button::new("SAMOSTOYATELNAYA").on_press(Message::ProcessGrade(1.2)).width(FillPortion(1));
+        let work3 = Button::new("PROVEROCHNAYA").on_press(Message::ProcessGrade(1.3)).width(FillPortion(1));
+        let work4 = Button::new("KONTROLNAYA").on_press(Message::ProcessGrade(1.5)).width(FillPortion(1));
         
         let rm_button = Button::new("DELETE LAST GRADE").on_press(Message::RemoveGrade);
-        let grade_in = TextInput::new("ENTER GRADE", &self.current_grade, Message::EditGrade);
+        let grade_in = TextInput::new("ENTER GRADE", &self.current_grade, Message::EditGrade)
+            .width(FillPortion(7)).padding(5);
 
-        let main_row = Column::new()
-            .push(Row::new().push(grade_in).spacing(20))
-            .push(Row::new().push(avg_out).push(rm_button).spacing(20))
-            .push(Row::new().push(work1).push(work2).push(work3).push(work4).spacing(5))
-            .spacing(20);
+        let main_column = Column::new()
+            .push(Row::new().push(avg_out).push(grade_in).spacing(10).padding(10))
+            .push(Row::new().push(rm_button).spacing(10).padding(10))
+            .push(Row::new().push(work1).push(work2).push(work3).push(work4).spacing(10).padding(10))
+            .spacing(10);
 
-        let container = Container::new(main_row)
+        let container = Container::new(main_column)
             .center_x().center_y()
             .width(iced::Length::Fill)
             .height(iced::Length::Fill).into();
