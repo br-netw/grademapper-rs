@@ -1,6 +1,6 @@
 use iced::Settings;
 use iced::Sandbox;
-use iced::widget::{Row, button, Button, Text, text_input, TextInput, Column, Container};
+use iced::widget::{Row, button, Button, text_input, TextInput, Radio, Text, Column, Container};
 use iced::Length::FillPortion;
 
 fn main() -> Result<(), iced::Error> {
@@ -11,29 +11,32 @@ fn main() -> Result<(), iced::Error> {
     GradeMapper::run(gm_settings)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum WorkType {
+    Classwork,
+    Test1,
+    Test2,
+    ControlTest
+}
+
 #[derive(Debug, Clone)]
 enum Message {
     EditGrade(String),
-    ProcessGrade(f32),
+    WorkTypeChoice(WorkType),
+    ProcessGrade,
     RemoveGrade,
 }
 
 struct GradeMapper {
     text_inp_state: text_input::State,
     remove_button_state: button::State,
-    button1_state: button::State,
-    button2_state: button::State,
-    button3_state: button::State,
-    button4_state: button::State,
+    submit_button_state: button::State,
+    work_type_selected: Option<WorkType>, 
     current_grade: String,
     current_weight: f32,
     grades: Vec<i32>,
     weights: Vec<f32>,
     avg: String,
-}
-
-trait CustomSandbox: Sandbox {
-    fn compute_avg(&mut self);
 }
 
 impl Sandbox for GradeMapper {
@@ -43,12 +46,10 @@ impl Sandbox for GradeMapper {
         GradeMapper{
             text_inp_state: text_input::State::new(),
             remove_button_state: button::State::new(),
-            button1_state: button::State::new(),
-            button2_state: button::State::new(),
-            button3_state: button::State::new(),
-            button4_state: button::State::new(),
+            submit_button_state: button::State::new(),
+            work_type_selected: Some(WorkType::Classwork),
             current_grade: String::new(), 
-            current_weight: 0.0,
+            current_weight: 1.0,
             grades: Vec::new(), 
             weights: Vec::new(), 
             avg: String::new()
@@ -61,8 +62,7 @@ impl Sandbox for GradeMapper {
 
     fn update(&mut self, click: Self::Message) {
         match click {
-            Message::ProcessGrade(f) => {
-                self.current_weight = f;
+            Message::ProcessGrade => {
                 if let Ok(res) = self.current_grade.parse() {
                     if res > 5 || res < 1 { // проверка на валидность оценки
                         self.avg = String::from("ERROR: incorrect grade");
@@ -71,6 +71,8 @@ impl Sandbox for GradeMapper {
                         self.weights.push(self.current_weight);
                         self.compute_avg();
                     }
+                    self.work_type_selected = Some(WorkType::Classwork);
+                    self.current_weight = 1.0;
                 } else {
                     self.avg = String::from("ERROR: not a number"); 
                 }
@@ -80,43 +82,52 @@ impl Sandbox for GradeMapper {
                 self.grades.remove(self.grades.len()-1);
                 self.compute_avg(); // пересчитываем
             },
-            Message::EditGrade(s) => self.current_grade = s.clone(), 
+            Message::EditGrade(s) => self.current_grade = s.clone(),
+            Message::WorkTypeChoice(t) => {
+                match t {
+                    WorkType::Classwork => self.current_weight = 1.0,
+                    WorkType::Test1 => self.current_weight = 1.2,
+                    WorkType::Test2 => self.current_weight = 1.3,
+                    WorkType::ControlTest => self.current_weight = 1.5,
+                };
+                self.work_type_selected = Some(t);
+            },
         }
     }
 
     fn view(&mut self) -> iced::Element<Self::Message> {
-        let avg_out = Text::new(format!("GRADE: {}", self.avg))
-            .width(FillPortion(1));
+        let avg_out = Text::new(format!("GRADE: {}", self.avg));
 
         // кириллица не работает
-        let work1 = Button::new(&mut self.button1_state, Text::new("Klassnaya"))
-            .on_press(Message::ProcessGrade(1.0)).width(FillPortion(1)).padding(10);
-        let work2 = Button::new(&mut self.button2_state, Text::new("Samostoyatelnaya"))
-            .on_press(Message::ProcessGrade(1.2)).width(FillPortion(1)).padding(10);
-        let work3 = Button::new(&mut self.button3_state, Text::new("Proverochnaya"))
-            .on_press(Message::ProcessGrade(1.3)).width(FillPortion(1)).padding(10);
-        let work4 = Button::new(&mut self.button4_state, Text::new("Kontrolnaya"))
-            .on_press(Message::ProcessGrade(1.5)).width(FillPortion(1)).padding(10);
-        
+        let submit_button = Button::new(&mut self.submit_button_state, Text::new("SUMBIT"))
+            .on_press(Message::ProcessGrade).width(FillPortion(1)).padding(10);
         let rm_button = Button::new(&mut self.remove_button_state, Text::new("DELETE LAST GRADE"))
             .on_press(Message::RemoveGrade).width(FillPortion(1)).padding(10);
         let grade_in = TextInput::new(&mut self.text_inp_state, "ENTER GRADE", &self.current_grade, Message::EditGrade)
-            .width(FillPortion(8)).padding(10);
+            .padding(10);
 
-        let main_column = Column::new()
-            .push(Row::new().push(avg_out).push(grade_in).spacing(10).padding(10))
-            .push(Row::new().push(rm_button).spacing(10).padding(10))
-            .push(Row::new().push(work1).push(work2).push(work3).push(work4).spacing(10).padding(10))
+        let type_classwork = Radio::new(WorkType::Classwork, "Klassanaya", self.work_type_selected, Message::WorkTypeChoice);
+        let type_test1 = Radio::new(WorkType::Test1, "Samostoyatelnaya", self.work_type_selected, Message::WorkTypeChoice);
+        let type_test2 = Radio::new(WorkType::Test2, "Proverochnaya", self.work_type_selected, Message::WorkTypeChoice);
+        let type_ctrl_test = Radio::new(WorkType::ControlTest, "Kontrolnaya", self.work_type_selected, Message::WorkTypeChoice);
+
+        let layout = Row::new()
+            .push(Column::new().push(grade_in).push(avg_out).spacing(10).padding(10).width(FillPortion(10)))
+            .push(Column::new()
+                  .push(type_classwork).push(type_test1)
+                  .push(type_test2).push(type_ctrl_test)
+                  .spacing(10).padding(10).width(FillPortion(3)))
+            .push(Column::new().push(submit_button).push(rm_button).spacing(10).padding(10).width(FillPortion(5)))
             .spacing(10).padding(20);
 
-        let container = Container::new(main_column)
+        let container = Container::new(layout)
             .center_x().center_y()
             .width(iced::Length::Fill)
             .height(iced::Length::Fill).into();
         return container;
     }
 }
-impl CustomSandbox for GradeMapper {
+impl GradeMapper {
     // находим среднее взвешенное
     fn compute_avg(&mut self) {
         let mut sum_grades = 0.0;
