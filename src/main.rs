@@ -1,13 +1,13 @@
-use iced::Settings;
-use iced::Sandbox;
+use iced::{executor, Application, Command, Element, Settings};
 use iced::widget::{Row, button, Button, text_input, TextInput, Radio, Text, Column, Container};
 use iced::Length::FillPortion;
+use iced::alignment::Horizontal;
 
-fn main() -> Result<(), iced::Error> {
+fn main() -> iced::Result {
     let mut gm_settings = Settings::default();
     gm_settings.id = Some(String::from("grademapper-rs"));
-    // Шрифт не меняется, но и прога не вылетает
-    gm_settings.default_font = Some(b"JetBrainsMono"); 
+    // Шрифт не меняется. Совсем. TODO
+    //gm_settings.default_font = Some(b"/usr/share/fonts/TTF/JetBrainsMono-Regular.ttf"); 
     GradeMapper::run(gm_settings)
 }
 
@@ -16,7 +16,7 @@ enum WorkType {
     Classwork,
     Test1,
     Test2,
-    ControlTest
+    Exam
 }
 
 #[derive(Debug, Clone)]
@@ -39,28 +39,30 @@ struct GradeMapper {
     avg: String,
 }
 
-impl Sandbox for GradeMapper {
+impl Application for GradeMapper {
+    type Executor = executor::Default;
     type Message = Message;
+    type Flags = ();
 
-    fn new() -> Self {
-        GradeMapper{
+    fn new(_flags: ()) -> (Self, Command<Self::Message>) {
+        (GradeMapper{
             text_inp_state: text_input::State::new(),
             remove_button_state: button::State::new(),
             submit_button_state: button::State::new(),
             work_type_selected: Some(WorkType::Classwork),
-            current_grade: String::new(), 
+            current_grade: String::new(),
             current_weight: 1.0,
             grades: Vec::new(), 
             weights: Vec::new(), 
             avg: String::new()
-        }
+        }, Command::none())
     }
 
     fn title(&self) -> String {
         String::from("GradeMapper (Rust edition)")
     }
 
-    fn update(&mut self, click: Self::Message) {
+    fn update(&mut self, click: Self::Message) -> Command<Self::Message> {
         match click {
             Message::ProcessGrade => {
                 if let Ok(res) = self.current_grade.parse() {
@@ -76,6 +78,16 @@ impl Sandbox for GradeMapper {
                 } else {
                     self.avg = String::from("ERROR: not a number"); 
                 }
+                self.current_grade = String::new();
+            },
+            Message::WorkTypeChoice(t) => {
+                match t {
+                    WorkType::Classwork => self.current_weight = 1.0,
+                    WorkType::Test1 => self.current_weight = 1.2,
+                    WorkType::Test2 => self.current_weight = 1.3,
+                    WorkType::Exam => self.current_weight = 1.5,
+                };
+                self.work_type_selected = Some(t);
             },
             Message::RemoveGrade => {
                 self.weights.remove(self.weights.len()-1);
@@ -83,47 +95,47 @@ impl Sandbox for GradeMapper {
                 self.compute_avg(); // пересчитываем
             },
             Message::EditGrade(s) => self.current_grade = s.clone(),
-            Message::WorkTypeChoice(t) => {
-                match t {
-                    WorkType::Classwork => self.current_weight = 1.0,
-                    WorkType::Test1 => self.current_weight = 1.2,
-                    WorkType::Test2 => self.current_weight = 1.3,
-                    WorkType::ControlTest => self.current_weight = 1.5,
-                };
-                self.work_type_selected = Some(t);
-            },
-        }
+        };
+        Command::none()
     }
 
-    fn view(&mut self) -> iced::Element<Self::Message> {
-        let avg_out = Text::new(format!("GRADE: {}", self.avg));
+    fn view(&mut self) -> Element<Self::Message> {
+        let avg_out = Text::new(format!("Average grade: {}", self.avg))
+            .horizontal_alignment(Horizontal::Center);
 
         // кириллица не работает
-        let submit_button = Button::new(&mut self.submit_button_state, Text::new("SUMBIT"))
+        let submit_button = Button::new(&mut self.submit_button_state, 
+                                        Text::new("Submit").horizontal_alignment(Horizontal::Center))
             .on_press(Message::ProcessGrade).width(FillPortion(1)).padding(10);
-        let rm_button = Button::new(&mut self.remove_button_state, Text::new("DELETE LAST GRADE"))
+        let rm_button = Button::new(&mut self.remove_button_state, 
+                                    Text::new("Delete last grade").horizontal_alignment(Horizontal::Center))
             .on_press(Message::RemoveGrade).width(FillPortion(1)).padding(10);
-        let grade_in = TextInput::new(&mut self.text_inp_state, "ENTER GRADE", &self.current_grade, Message::EditGrade)
+        let grade_in = TextInput::new(&mut self.text_inp_state, "Enter grade", &self.current_grade, Message::EditGrade)
             .padding(10);
 
         let type_classwork = Radio::new(WorkType::Classwork, "Klassanaya", self.work_type_selected, Message::WorkTypeChoice);
         let type_test1 = Radio::new(WorkType::Test1, "Samostoyatelnaya", self.work_type_selected, Message::WorkTypeChoice);
         let type_test2 = Radio::new(WorkType::Test2, "Proverochnaya", self.work_type_selected, Message::WorkTypeChoice);
-        let type_ctrl_test = Radio::new(WorkType::ControlTest, "Kontrolnaya", self.work_type_selected, Message::WorkTypeChoice);
+        let type_exam = Radio::new(WorkType::Exam, "Kontrolnaya", self.work_type_selected, Message::WorkTypeChoice);
 
         let layout = Row::new()
-            .push(Column::new().push(grade_in).push(avg_out).spacing(10).padding(10).width(FillPortion(10)))
+            .push(Column::new()
+                  .push(grade_in).push(avg_out)
+                  .spacing(10).padding(10).width(FillPortion(9)))
             .push(Column::new()
                   .push(type_classwork).push(type_test1)
-                  .push(type_test2).push(type_ctrl_test)
+                  .push(type_test2).push(type_exam)
                   .spacing(10).padding(10).width(FillPortion(3)))
-            .push(Column::new().push(submit_button).push(rm_button).spacing(10).padding(10).width(FillPortion(5)))
+            .push(Column::new()
+                  .push(submit_button).push(rm_button)
+                  .spacing(10).padding(10).width(FillPortion(5)))
             .spacing(10).padding(20);
 
         let container = Container::new(layout)
             .center_x().center_y()
             .width(iced::Length::Fill)
             .height(iced::Length::Fill).into();
+        
         return container;
     }
 }
