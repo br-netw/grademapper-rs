@@ -7,7 +7,8 @@ fn main() -> iced::Result {
     let mut gm_settings = Settings::default();
     gm_settings.id = Some(String::from("grademapper-rs"));
     // Font fallback'a в iced нет. Страдайте.
-    gm_settings.default_font = Some(include_bytes!("/usr/share/fonts/TTF/OpenSans-Regular.ttf")); 
+    gm_settings.default_font = Some(include_bytes!("/usr/share/fonts/TTF/OpenSans-Regular.ttf"));
+    gm_settings.default_text_size = 24;
     GradeMapper::run(gm_settings)
 }
 
@@ -123,22 +124,19 @@ impl Application for GradeMapper {
 
         let layout = Row::new()
             .push(Column::new()
-                  .push(grade_in).push(avg_out)
+                  .push(grade_in).push(submit_button).push(rm_button).push(avg_out)
                   .spacing(10).padding(10).width(FillPortion(3)))
             .push(Column::new()
                   .push(type_classwork).push(type_test1)
                   .push(type_test2).push(type_vocal_exam)
                   .push(type_exam)
                   .spacing(10).padding(10).width(FillPortion(5)))
-            .push(Column::new()
-                  .push(submit_button).push(rm_button)
-                  .spacing(10).padding(10).width(FillPortion(5)))
             .spacing(10).padding(20);
 
         let container = Container::new(layout)
-            .center_x().center_y()
-            .width(iced::Length::Fill)
-            .height(iced::Length::Fill).into();
+            //.width(iced::Length::Fill)
+            //.height(iced::Length::Fill)
+            .center_x().center_y().into();
         
         return container;
     }
